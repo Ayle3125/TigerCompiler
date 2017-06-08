@@ -202,7 +202,7 @@ public class CommandLine
   public void usage()
   {
     System.out
-        .println("The Tiger compiler. Copyright (C) 2013-, SSE of USTC.\n"
+        .println("The Tiger compiler.\n"
             + "Usage: java Tiger [options] <filename>\n");
     output();
     return;
