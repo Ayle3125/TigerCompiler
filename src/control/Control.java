@@ -23,7 +23,6 @@ public class Control
   public static class ConAst
   {
     public static boolean dumpAst = false;
-    public static boolean testFac = false;
 
     // elaborator
     public static boolean elabClassTable = false;

@@ -1,14 +1,16 @@
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.InputStream;
+import java.io.PushbackInputStream;
+
 import static control.Control.ConAst.dumpAst;
-import static control.Control.ConAst.testFac;
+//import static control.Control.ConAst.testFac;
 import ast.Ast.Program;
 
 import lexer.Lexer;
 import lexer.Token;
 import parser.Parser;
-import parser.sym;
+//import parser.sym;
 import control.CommandLine;
 import control.Control;
 
@@ -21,8 +23,7 @@ public class Tiger
   {
     InputStream fstream;
     Parser parser;
-    //PushbackInputStream  pstream;
-
+    PushbackInputStream  pstream;
     // ///////////////////////////////////////////////////////
     // handle command line arguments
     CommandLine cmd = new CommandLine();
@@ -50,7 +51,7 @@ public class Tiger
       cmd.usage();
       return;
     }
-   
+  
     // /////////////////////////////////////////////////////
     // it would be helpful to be able to test the lexer
     // independently.
@@ -58,23 +59,24 @@ public class Tiger
       System.out.println("Testing the lexer. All tokens:");
       try {
         fstream = new BufferedInputStream(new FileInputStream(fname));
-        //pstream=new PushbackInputStream(fstream);
-        Lexer lexer = new Lexer(fstream);   
-        //Lexer lexer = new Lexer(fname, pstream);       
-        /*
+        pstream = new PushbackInputStream(fstream);
+        //Lexer lexer = new Lexer(fstream);   
+        Lexer lexer = new Lexer(fname, pstream);       
+        
         Token token = lexer.nextToken();
         while (token.kind != Token.Kind.TOKEN_EOF) {
           System.out.println(token.toString());
           token = lexer.nextToken();
         }       
-        */
+        
         java_cup.runtime.Symbol tok;
-
+        /*
         do { 
            tok=lexer.next_token();
            System.out.println(symnames[tok.sym] + " " + tok.left);
         } while (tok.sym != sym.EOF);
 		
+		*/
         fstream.close();
       } catch (Exception e) {
         e.printStackTrace();
@@ -83,12 +85,15 @@ public class Tiger
     }
 
     //Control.ConCodeGen.fileName = fname;
+
     Program.T theAst = null;
+    
     // /////////////////////////////////////////////////////////
     // normal compilation phases.
     try {
       fstream = new BufferedInputStream(new FileInputStream(fname));
       //parser = new Parser(new Lexer(fstream));
+      pstream = new PushbackInputStream(fstream);
       parser = new Parser(fname, pstream);
       theAst = parser.parse();
 
@@ -97,61 +102,20 @@ public class Tiger
       e.printStackTrace();
       System.exit(1);
     }
-    return;
-  }
-  // pretty printing the AST, if necessary
-  if (dumpAst) {
-    ast.PrettyPrintVisitor pp = new ast.PrettyPrintVisitor();
-    theAst.accept(pp);
-  }
-
-
-  // elaborate the AST, report all possible errors.
-  elaborator.ElaboratorVisitor elab = new elaborator.ElaboratorVisitor();
-  theAst.accept(elab);
   
-  static String symnames[] = new String[100];
-  static {
-     
-     symnames[sym.MULT] = "MULT";
-     symnames[sym.AND_AND] = "AND_AND";
-     symnames[sym.LPAREN] = "LPAREN";
-     symnames[sym.INT] = "INT";
-     symnames[sym.MINUS] = "MINUS";
-     symnames[sym.STATIC] = "STATIC";
-     symnames[sym.RPAREN] = "RPAREN";
-     symnames[sym.BOOLEAN_LITERAL] = "BOOLEAN_LITERAL";
-     symnames[sym.NOT] = "NOT";
-     symnames[sym.SEMICOLON] = "SEMICOLON";
-     symnames[sym.LT] = "LT";
-     symnames[sym.COMMA] = "COMMA";
-     symnames[sym.CLASS] = "CLASS";
-     symnames[sym.PLUS] = "PLUS";
-     symnames[sym.MINUS] = "MINUS";
-     symnames[sym.MAIN] = "MAIN";
-     symnames[sym.IF] = "IF";
-     symnames[sym.THIS] = "THIS";
-     symnames[sym.DOT] = "DOT";
-     symnames[sym.EOF] = "EOF";
-     symnames[sym.COMMA] = "COMMA";
-     symnames[sym.BOOLEAN] = "BOOLEAN";
-     symnames[sym.RETURN] = "RETURN";
-     symnames[sym.NEW] = "NEW";
-     symnames[sym.error] = "error";
-     symnames[sym.VOID] = "VOID";
-     symnames[sym.EQ] = "EQ";
-     symnames[sym.LBRACK] = "LBRACK";
-     symnames[sym.LBRACE] = "LBRACE";
-     symnames[sym.ELSE] = "ELSE";
-     symnames[sym.SYSTEM_OUT_PRINTLN] = "SYSTEM_OUT_PRINTLN";
-     symnames[sym.RBRACK] = "RBRACK";
-     symnames[sym.WHILE] = "WHILE";
-     symnames[sym.PUBLIC] = "PUBLIC";
-     symnames[sym.RBRACE] = "RBRACE";
-     symnames[sym.EXTENDS] = "EXTENDS";
-     symnames[sym.STRING] = "STRING";
-     symnames[sym.LENGTH] = "LENGTH";
-     symnames[sym.INTEGER_LITERAL] = "INTEGER_LITERAL";
-     symnames[sym.IDENTIFIER] = "IDENTIFIER";
-   }
+    // pretty printing the AST, if necessary
+    if (dumpAst) {
+    	ast.PrettyPrintVisitor pp = new ast.PrettyPrintVisitor();
+    	theAst.accept(pp);
+    }
+
+
+    // elaborate the AST, report all possible errors.
+    elaborator.ElaboratorVisitor elab = new elaborator.ElaboratorVisitor();
+    theAst.accept(elab);
+
+    return;
+    
+  }
+
 }

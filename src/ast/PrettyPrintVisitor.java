@@ -103,9 +103,15 @@ public class PrettyPrintVisitor implements Visitor
   {
     e.exp.accept(this);
     this.say("." + e.id + "(");
+    boolean isFirst=true;
     for (Exp.T x : e.args) {
-      x.accept(this);
-      this.say(", ");
+    	if (isFirst) {
+    		isFirst = false;
+    	}
+    	else {
+    		this.say(", ");
+    	}
+    	x.accept(this);
     }
     this.say(")");
     return;
@@ -206,7 +212,7 @@ public class PrettyPrintVisitor implements Visitor
     this.printSpaces();
     this.say(s.id + " = ");
     s.exp.accept(this);
-    this.say(";");
+    this.sayln(";");
     return;
   }
 
@@ -269,7 +275,9 @@ public class PrettyPrintVisitor implements Visitor
 	  s.condition.accept(this);
 	  this.sayln("){");
 	  this.indent();
+	  
 	  s.body.accept(this);
+	  
 	  this.unIndent();
 	  this.printSpaces();;
 	  this.sayln("}");
@@ -314,10 +322,17 @@ public class PrettyPrintVisitor implements Visitor
     this.say("  public ");
     m.retType.accept(this);
     this.say(" " + m.id + "(");
+    boolean isFirst=true;
     for (Dec.T d : m.formals) {
       Dec.DecSingle dec = (Dec.DecSingle) d;
+      if (isFirst) {
+    	  isFirst = false;
+      }
+      else {
+    	  this.say(", ");
+      }
       dec.type.accept(this);
-      this.say(" " + dec.id + ", ");
+      this.say(" " + dec.id );
     }
     this.sayln(")");
     this.sayln("  {");
