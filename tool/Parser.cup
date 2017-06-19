@@ -3,13 +3,30 @@
  * Change this into the parser for your implementation of MiniJava.
  */
 
-package Parser;
+package parser;
 
 import java.util.LinkedList;
-import Throwables.*;
-import ast.AST.*;
 import java.util.*;
 import java_cup.runtime.*;
+
+import util.Flist;
+import ast.Ast.Class;
+import ast.Ast.Dec;
+import ast.Ast.Exp;
+import ast.Ast.Exp.*;
+import ast.Ast.MainClass;
+import ast.Ast.MainClass.MainClassSingle;
+import ast.Ast.Method;
+import ast.Ast.Program.ProgramSingle;
+import ast.Ast.Stm.T;
+import ast.Ast.Stm;
+import ast.Ast.Stm.*;
+import ast.Ast.Stm.If;
+import ast.Ast.Stm.While;
+import ast.Ast.Stm.Print;
+import ast.Ast.Stm.Assign;
+import ast.Ast.Stm.AssignArray;
+import ast.Ast.Type;
 
 
 /* Terminals (tokens returned by the scanner) */
@@ -41,6 +58,27 @@ terminal Integer INTEGER_LITERAL;
 
 /* Nonterminals */
 
+nonterminal Type Type;
+nonterminal Dec VarDeclaration;
+nonterminal Exp Expression;
+nonterminal Stm Statement;
+nonterminal Method MethodDecl;
+nonterminal Class ClassDecl;
+nonterminal MainClass MainClass;
+nonterminal Program Program;
+
+nonterminal MainClassSingle MainClassSingle;
+nonterminal ProgramSingle ProgramSingle;
+
+nonterminal Identifier;
+nonterminal VarDeclarationList, ExpList, StatementList, MethodDeclList, ClassDeclList;
+
+nonterminal FormalList, FormalParameter, FormalParameterList, FormalParameterListAndParens;
+
+
+nonterminal MethodInvocationParameterList, ExpressionList;
+
+/*
 nonterminal Program Program;
 nonterminal StatementList StatementList;
 nonterminal MainClass MainClass;
@@ -61,6 +99,7 @@ nonterminal ExpList MethodInvocationParameterList;
 nonterminal ExpList ExpressionList;
 nonterminal ClassDecl ClassDecl;
 nonterminal ClassDeclList ClassDeclList;
+*/
 
 /* Precedence declarations */
 
@@ -75,7 +114,7 @@ precedence left DOT;
 /* Productions */
 
 Program ::= MainClass:m ClassDeclList:c
-            {: RESULT = new Program(m, c, mleft); :};
+            {: RESULT = new ProgramSingle(m, c); :};
 
 // Need to go backwards or things break. AST node type StatementList
 // ensures that the ordering all works later on.
@@ -93,13 +132,11 @@ ClassDecl ::= CLASS Identifier:i LBRACE VarDeclarationList:v MethodDeclList:m RB
             {: RESULT = new ClassDeclExtends(i, parent, v, m, ileft); :};
 
 ClassDeclList ::=
-            {: RESULT = new ClassDeclList(0); :}
-        | ClassDecl:c ClassDeclList:l
+            ClassDecl:c ClassDeclList:l
             {: RESULT = l; l.addElement(c); :};
 
 MethodDeclList ::=
-            {: RESULT = new MethodDeclList(0); :}
-        | MethodDecl:m MethodDeclList:l
+           MethodDecl:m MethodDeclList:l
             {: RESULT = l; l.addElement(m); :};
 
 MethodDecl ::= PUBLIC:p Type:t Identifier:i FormalParameterListAndParens:params LBRACE VarDeclarationList:vars StatementList:stmts RETURN Expression:rv SEMICOLON RBRACE
@@ -145,10 +182,6 @@ Expression    ::= IDENTIFIER:name
             {: RESULT = new This(tleft); :}
         | NEW:n Identifier:i LPAREN RPAREN
             {: RESULT = new NewObject(i, nleft); :}
-        | ArrayLength:l
-            {: RESULT = l; :}
-        | ArrayLookup:l
-            {: RESULT = l; :}
         | NEW:n INTEGER_TYPE LBRACKET Expression:e RBRACKET
             {: RESULT = new NewArray(e, nleft); :}
         | Expression:e DOT Identifier:id MethodInvocationParameterList:l
@@ -182,23 +215,18 @@ VarDeclarationList ::=
 FormalParameter ::= Type:t Identifier:i
             {: RESULT = new Formal(t, i, tleft); :};
 
-FormalParameterListAndParens ::= LPAREN:l RPAREN
-            {: RESULT = new FormalList(lleft); :}
-        | LPAREN FormalParameterList:params RPAREN
+FormalParameterListAndParens ::= 
+           | LPAREN FormalParameterList:params RPAREN
             {: RESULT = params; :};
 
 FormalParameterList ::= FormalParameter:p COMMA FormalParameterList:l
-            {: RESULT = l; l.addElement(p); :}
-        | FormalParameter:p
-            {: RESULT = new FormalList(pleft); RESULT.addElement(p); :};
+            {: RESULT = l; l.addElement(p); :};
 
-MethodInvocationParameterList ::= LPAREN:l RPAREN
-            {: RESULT = new ExpList(lleft); :}
-        | LPAREN:l ExpressionList:e RPAREN
+MethodInvocationParameterList ::= 
+             LPAREN:l ExpressionList:e RPAREN
             {: RESULT = e; :}
         ;
 
-ExpressionList ::= Expression:e
-            {: RESULT = new ExpList(eleft); RESULT.addElement(e); :}
-        | Expression:e COMMA ExpressionList:l
+ExpressionList ::= Expression:e COMMA ExpressionList:l
             {: RESULT = l; RESULT.addElement(e); :};
+
