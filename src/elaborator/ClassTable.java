@@ -1,7 +1,6 @@
 package elaborator;
 
 import ast.Ast.Type;
-import util.Todo;
 
 public class ClassTable
 {
@@ -82,7 +81,7 @@ public class ClassTable
 
   public void dump()
   {
-    new Todo();
+      System.out.println(this.table);
   }
 
   @Override
