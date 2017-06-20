@@ -13,7 +13,7 @@ class Doit {
         sum = 0;
         while (i<n){
         	sum = sum + i;
-        	i = i+a;
+        	i = i+1;
         }
         return sum;
     }

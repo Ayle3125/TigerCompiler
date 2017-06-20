@@ -47,7 +47,6 @@ class BS{
 	int left ;
 	boolean var_cont ;
 	int medium ;
-	int aux01 ;
 	int nt ;
 
 	aux01 = 0 ;
