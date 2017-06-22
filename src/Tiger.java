@@ -114,6 +114,27 @@ public class Tiger
     elaborator.ElaboratorVisitor elab = new elaborator.ElaboratorVisitor();
     theAst.accept(elab);
 
+
+    // code generation
+    Control.ConCodeGen.fileName = fname;
+
+    switch (control.Control.ConCodeGen.codegen) {
+    case Bytecode:
+      codegen.bytecode.TranslateVisitor trans = new codegen.bytecode.TranslateVisitor();
+      theAst.accept(trans);
+      codegen.bytecode.Ast.Program.T bytecodeAst = trans.program;
+      codegen.bytecode.PrettyPrintVisitor ppbc = new codegen.bytecode.PrettyPrintVisitor();
+      bytecodeAst.accept(ppbc);
+      break;
+    case C:
+      codegen.C.TranslateVisitor transC = new codegen.C.TranslateVisitor();
+      theAst.accept(transC);
+      codegen.C.Ast.Program.T cAst = transC.program;
+      codegen.C.PrettyPrintVisitor ppc = new codegen.C.PrettyPrintVisitor();
+      cAst.accept(ppc);
+      break;
+    }
+    
     return;
     
   }

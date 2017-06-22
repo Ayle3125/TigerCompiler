@@ -133,9 +133,11 @@ public class ElaboratorVisitor implements ast.Visitor
         
         MethodType mty = this.classTable.getm(type.id, e.id);
         java.util.LinkedList<Type.T> argsty = new LinkedList<Type.T>();
-        for (Exp.T a : e.args) {
-            a.accept(this);
-            argsty.addLast(this.type);
+        if(e.args!=null) {
+            for (Exp.T a : e.args) {
+                a.accept(this);
+                argsty.addLast(this.type);
+            }
         }
         if (mty.argsType.size() != argsty.size()) {
             error( getLineNumber(), "");
