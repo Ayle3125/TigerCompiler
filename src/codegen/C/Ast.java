@@ -233,12 +233,18 @@ public class Ast
         public static class Id extends T
         {
             public String id;
+            public boolean isField;
+            public boolean isLocal;
+
+            public ast.Ast.Type.T type;
             
-            public Id(String id)
-            {
+            public Id(String id, boolean isField, boolean isLocal, ast.Ast.Type.T type ) {
                 this.id = id;
+                this.isField = isField;
+                this.isLocal = isLocal;
+                this.type = type ;
             }
-            
+           
             @Override
             public void accept(Visitor v)
             {
@@ -438,11 +444,16 @@ public class Ast
         {
             public String id;
             public Exp.T exp;
+            public boolean isField;
+            public boolean isLocal;
+            public ast.Ast.Type.T type;
             
-            public Assign(String id, Exp.T exp)
-            {
+            public Assign(String id, Exp.T exp, boolean isField, boolean isLocal, ast.Ast.Type.T type) {
                 this.id = id;
                 this.exp = exp;
+                this.isField = isField;
+                this.isLocal = isLocal;
+                this.type = type;
             }
             
             @Override
@@ -457,12 +468,15 @@ public class Ast
             public String id;
             public Exp.T index;
             public Exp.T exp;
-            
-            public AssignArray(String id, Exp.T index, Exp.T exp)
-            {
+            public boolean isField;
+            public boolean isLocal;
+
+            public AssignArray(String id, Exp.T index, Exp.T exp, boolean isField, boolean isLocal) {
                 this.id = id;
                 this.index = index;
                 this.exp = exp;
+                this.isField = isField;
+                this.isLocal = isLocal;
             }
             
             @Override
@@ -585,11 +599,13 @@ public class Ast
         {
             public String id; // name of the class
             public java.util.ArrayList<codegen.C.Ftuple> ms; // all methods
+            public Class.T classs;
             
-            public VtableSingle(String id, ArrayList<codegen.C.Ftuple> ms)
+            public VtableSingle(String id, ArrayList<codegen.C.Ftuple> ms, Class.T classs)
             {
                 this.id = id;
                 this.ms = ms;
+                this.classs = classs;
             }
             
             @Override

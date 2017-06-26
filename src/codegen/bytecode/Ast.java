@@ -140,6 +140,16 @@ public class Ast
             }
         }
         
+        public static class Arraylength extends T {
+            public Arraylength() {
+            }
+
+            @Override
+            public void accept(Visitor v) {
+                v.visit(this);
+            }
+        }
+        
         public static class Astore extends T
         {
             public int index;
@@ -168,6 +178,16 @@ public class Ast
             @Override
             public void accept(Visitor v)
             {
+                v.visit(this);
+            }
+        }
+        
+        public static class Iaload extends T {
+            public Iaload() {
+            }
+
+            @Override
+            public void accept(Visitor v) {
                 v.visit(this);
             }
         }
@@ -285,6 +305,16 @@ public class Ast
             }
         }
         
+        public static class Iastore extends T {
+            public Iastore() {
+            }
+
+            @Override
+            public void accept(Visitor v) {
+                v.visit(this);
+            }
+        }
+        
         public static class Isub extends T
         {
             public Isub()
@@ -360,6 +390,16 @@ public class Ast
             }
         }
         
+        public static class NewarrayInt extends T {
+            public NewarrayInt() {
+            }
+
+            @Override
+            public void accept(Visitor v) {
+                v.visit(this);
+            }
+        }
+        
         public static class Print extends T
         {
             public Print()
@@ -372,7 +412,42 @@ public class Ast
                 v.visit(this);
             }
         }
+
+        public static class Getfield extends T {
+            public String classId;
+            public String id;
+            public Type.T type;
+            
+            public Getfield(String classId, String id, Type.T type) {
+                this.classId = classId;
+                this.id = id;
+                this.type = type;
+            }
+            
+            @Override
+            public void accept(Visitor v) {
+                v.visit(this);
+            }
+        }
         
+        public static class Putfield extends T {
+            public String classId;
+            public String id;
+            public Type.T type;
+            public LinkedList<T> assignList;
+
+            public Putfield(String classId, String id, Type.T type, LinkedList<T> assignList) {
+                this.classId = classId;
+                this.id = id;
+                this.type = type;
+                this.assignList = assignList;
+            }
+
+            @Override
+            public void accept(Visitor v) {
+                v.visit(this);
+            }
+        }
     }// end of statement
     
     // ////////////////////////////////////////////////

@@ -173,6 +173,10 @@ public class ElaboratorVisitor implements ast.Visitor
             // useful in later phase.
             e.isField = true;
         }
+        if (this.methodTable.locals.get(e.id) != null) {
+            e.isLocal = true;
+        }
+        
         if (type == null) {
             error( getLineNumber(), "");
         }
@@ -280,9 +284,15 @@ public class ElaboratorVisitor implements ast.Visitor
         // if search failed, then s.id must
         if (type == null) {
             type = this.classTable.get(this.currentClass, s.id);
+            s.isField = true;
         }
+
+        if (this.methodTable.locals.get(s.id) != null) {
+            s.isLocal = true;
+        }
+        
         if (type == null) {
-            error( getLineNumber(), "");
+            error( getLineNumber(), "Assign unknow ");
         }
         s.exp.accept(this);
         s.type = type;
@@ -299,9 +309,15 @@ public class ElaboratorVisitor implements ast.Visitor
         
         if(type == null) {
             type = this.classTable.get(this.currentClass, s.id);
+            s.isField = true;
         }
+
+        if (this.methodTable.locals.get(s.id) != null) {
+            s.isLocal = true;
+        }
+        
         if(type == null) {
-            error( getLineNumber(), "");
+            error( getLineNumber(), "unknow int array");
         }
         
         s.index.accept(this);

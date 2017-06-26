@@ -49,6 +49,8 @@ public class TranslateVisitor implements ast.Visitor
     private Method.T method;
     private Class.T classs;
     private MainClass.T mainClass;
+    private boolean inAssign;
+    private LinkedList<Stm.T> assignList;
     public Program.T program;
     
     public TranslateVisitor()
@@ -62,6 +64,8 @@ public class TranslateVisitor implements ast.Visitor
         this.classs = null;
         this.mainClass = null;
         this.program = null;
+        this.inAssign = false;
+        this.assignList = null;
     }
     
     public static int getLineNumber() {
@@ -74,7 +78,10 @@ public class TranslateVisitor implements ast.Visitor
     
     private void emit(Stm.T s)
     {
-        this.stms.add(s);
+        if (this.inAssign)
+            this.assignList.add(s);
+        else
+            this.stms.add(s);
     }
     
     
@@ -85,7 +92,6 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.Add e)
     {
-        //System.out.println("imple  ->"+getLineNumber());
         e.left.accept(this);
         e.right.accept(this);
         emit(new Iadd());
@@ -94,13 +100,29 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.And e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        Label left = new Label(), right = new Label(), out = new Label();
+        e.left.accept(this);
+        emit(new Stm.Ifne(left));
+        emit(new Stm.Ldc(0));
+        emit(new Stm.Goto(out));
+
+        emit(new LabelJ(left));
+        e.right.accept(this);
+        emit(new Stm.Ifne(right));
+        emit(new Stm.Ldc(0));
+        emit(new Stm.Goto(out));
+
+        emit(new LabelJ(right));
+        emit(new Stm.Ldc(1));
+        emit(new LabelJ(out));
     }
     
     @Override
     public void visit(ast.Ast.Exp.ArraySelect e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        e.array.accept(this);
+        e.index.accept(this);
+        emit(new Stm.Iaload());
     }
     
     //public Call(T exp, String id, java.util.LinkedList<T> args)
@@ -128,48 +150,55 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.False e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        emit(new Stm.Ldc(0));
     }
     
     @Override
     public void visit(ast.Ast.Exp.Id e)
     {
-        int index = this.indexTable.get(e.id);
-        ast.Ast.Type.T type = e.type;
-        if (type.getNum() > 0)// a reference
-            emit(new Aload(index));
-        else
-            emit(new Iload(index));
-        // but what about this is a field?
+
+        if (e.isField) {
+            e.type.accept(this);
+            Type.T type = this.type;
+            emit(new Stm.Getfield(this.classId, e.id, type));
+        } else {
+            int index = this.indexTable.get(e.id);
+            ast.Ast.Type.T type = e.type;
+            if (type.getNum() > 0)// a reference
+                emit(new Stm.Aload(index));
+            else
+                emit(new Stm.Iload(index));
+        }
         return;
     }
     
     @Override
     public void visit(ast.Ast.Exp.Length e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        e.array.accept(this);
+        emit(new Stm.Arraylength());
     }
     
     //public Lt(T left, T right)// tl=3   fl=4   el=5
     @Override
     public void visit(ast.Ast.Exp.Lt e)
     {
-        //    Label tl = new Label(), fl = new Label(), el = new Label();
-        //    e.left.accept(this);
-        //    e.right.accept(this);
-        //    emit(new Ificmplt(tl));
-        //    emit(new LabelJ(fl));
-        //    emit(new Ldc(0));
-        //    emit(new Goto(el));
-        //    emit(new LabelJ(tl));
-        //    emit(new Ldc(1));
-        //    emit(new Goto(el));
-        //    emit(new LabelJ(el));
-        
+        Label tl = new Label(), fl = new Label(), el = new Label();
         e.left.accept(this);
         e.right.accept(this);
-        emit(new Ificmplt(g_label));
-        g_label=null;
+        emit(new Ificmplt(tl));
+        emit(new LabelJ(fl));
+        emit(new Ldc(0));
+        emit(new Goto(el));
+        emit(new LabelJ(tl));
+        emit(new Ldc(1));
+        emit(new Goto(el));
+        emit(new LabelJ(el));
+        
+//        e.left.accept(this);
+//        e.right.accept(this);
+//        emit(new Ificmplt(g_label));
+//        g_label=null;
         
         return;
     }
@@ -178,7 +207,8 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.NewIntArray e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        e.exp.accept(this);
+        emit(new Stm.NewarrayInt());
     }
     
     @Override
@@ -191,7 +221,7 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.Not e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        System.out.println("NOT ->"+getLineNumber());
     }
     
     @Override
@@ -229,7 +259,7 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.True e)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        System.out.println("imple True  ->"+getLineNumber());
     }
     
     
@@ -239,30 +269,47 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Stm.Assign s)
     {
-        s.exp.accept(this);
-        int index = this.indexTable.get(s.id);
-        ast.Ast.Type.T type = s.type;
-        
-        if (type.getNum() > 0)
-            emit(new Astore(index));
-        else
-            emit(new Istore(index));
-        
+        if (s.isField) {
+            this.inAssign = true;//capture all emitted stm
+            this.assignList = new LinkedList<Stm.T>();
+            s.exp.accept(this);
+            s.type.accept(this);
+            Type.T type = this.type;
+            this.inAssign = false;
+            emit( new Stm.Putfield(this.classId, s.id, type, this.assignList) );
+            this.assignList = null;
+        } else {
+            s.exp.accept(this);
+            int index = this.indexTable.get(s.id);
+            ast.Ast.Type.T type = s.type;
+            
+            if (type.getNum() > 0)
+                emit(new Astore(index));
+            else
+                emit(new Istore(index));
+        }
         return;
     }
     
     @Override
     public void visit(ast.Ast.Stm.AssignArray s)
     {
-        System.out.println("imple  ->"+getLineNumber());
+        if (s.isField) {
+            emit(new Stm.Getfield(this.classId, s.id, new Type.IntArray()));
+        } else {
+            int index = this.indexTable.get(s.id);
+            emit(new Stm.Aload(index));
+        }
+        s.index.accept(this);
+        s.exp.accept(this);
+        emit(new Stm.Iastore());
+ 
     }
     
     @Override
     public void visit(ast.Ast.Stm.Block s)
     {
-        //System.out.println("imple  ->"+getLineNumber());
-        for (ast.Ast.Stm.T stm : s.stms) 
-        {
+        for (ast.Ast.Stm.T stm : s.stms) {
             stm.accept(this);
         }
     }
@@ -273,17 +320,17 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Stm.If s)
     {
-        //    Label tl = new Label(), fl = new Label(), el = new Label();
-        //    s.condition.accept(this);
-        //
-        //    emit(new Ifne(tl));
-        //    emit(new LabelJ(fl));
-        //    s.elsee.accept(this);
-        //    emit(new Goto(el));
-        //    emit(new LabelJ(tl));
-        //    s.thenn.accept(this);
-        //    emit(new Goto(el));
-        //    emit(new LabelJ(el));
+/*        Label tl = new Label(), fl = new Label(), el = new Label();
+        s.condition.accept(this);
+        
+        emit(new Ifne(tl));
+        emit(new LabelJ(fl));
+        s.elsee.accept(this);
+        emit(new Goto(el));
+        emit(new LabelJ(tl));
+        s.thenn.accept(this);
+        emit(new Goto(el));
+        emit(new LabelJ(el));*/
         
         Label succLabel = new Label(),
                 endLabel  = new Label(); 
@@ -310,8 +357,6 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Stm.While s)
     {
-        //	  System.out.println("imple  ->"+getLineNumber());
-        
         Label origLabel  = new Label(),  
                 succlLabel = new Label(), 
                 endLabel   = new Label();
@@ -333,17 +378,14 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Type.Boolean t)
     {
-        System.out.println("imple  ->"+getLineNumber());
-        
+        this.type = new Type.Int(); 
     }
     
     // public ClassType(String id)
     @Override
     public void visit(ast.Ast.Type.ClassType t)
     {
-        //System.out.println("imple  ->"+getLineNumber());
-        
-        
+        this.type = new ClassType(t.id);     
     }
     
     @Override
@@ -355,8 +397,6 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Type.IntArray t)
     {
-        //System.out.println("imple  ->"+getLineNumber());
-        
         this.type = new IntArray(); 
         
     }

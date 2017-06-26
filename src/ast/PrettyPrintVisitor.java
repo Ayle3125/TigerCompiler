@@ -41,17 +41,17 @@ public class PrettyPrintVisitor implements Visitor
 
   public PrettyPrintVisitor()
   {
-    this.indentLevel = 4;
+    this.indentLevel = 0;
   }
 
   private void indent()
   {
-    this.indentLevel += 2;
+    this.indentLevel += 4;
   }
 
   private void unIndent()
   {
-    this.indentLevel -= 2;
+    this.indentLevel -= 4;
   }
 
   private void printSpaces()

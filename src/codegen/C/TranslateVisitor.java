@@ -150,7 +150,7 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.Id e)
     {
-        this.exp = new Id(e.id);
+        this.exp = new Id(e.id, e.isField, e.isLocal, e.type);
         return;
     }
     
@@ -250,7 +250,7 @@ public class TranslateVisitor implements ast.Visitor
     public void visit(ast.Ast.Stm.Assign s)
     {
         s.exp.accept(this);
-        this.stm = new Assign(s.id, this.exp);
+        this.stm = new Assign(s.id, this.exp, s.isField, s.isLocal, s.type);
         return;
     }
     
@@ -258,13 +258,12 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Stm.AssignArray s)
     {
-        //error(getLineNumber());
         String id = s.id;
         s.index.accept(this);
         Exp.T index = this.exp;
         s.exp.accept(this);
         
-        this.stm = new AssignArray(id, index, exp); 
+        this.stm = new AssignArray(id, index, exp, s.isField, s.isLocal);
         
     }
     
@@ -402,8 +401,9 @@ public class TranslateVisitor implements ast.Visitor
     public void visit(ast.Ast.Class.ClassSingle c)
     {
         ClassBinding cb = this.table.get(c.id);
-        this.classes.add(new ClassSingle(c.id, cb.fields));
-        this.vtables.add(new VtableSingle(c.id, cb.methods));
+        ClassSingle classs = new ClassSingle(c.id, cb.fields);
+        this.classes.add(classs);
+        this.vtables.add(new VtableSingle(c.id, cb.methods, classs));
         this.classId = c.id;
         for (ast.Ast.Method.T m : c.methods) {
             m.accept(this);
@@ -419,7 +419,7 @@ public class TranslateVisitor implements ast.Visitor
         ClassBinding cb = this.table.get(c.id);
         Class.T newc = new ClassSingle(c.id, cb.fields);
         this.classes.add(newc);
-        this.vtables.add(new VtableSingle(c.id, cb.methods));
+        this.vtables.add(new VtableSingle(c.id, cb.methods,newc));
         
         this.tmpVars = new LinkedList<Dec.T>();
         

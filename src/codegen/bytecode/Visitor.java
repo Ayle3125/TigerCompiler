@@ -11,9 +11,12 @@ import codegen.bytecode.Ast.Type.*;
 public interface Visitor
 {
     // statements
-    public void visit(Aload s);
+
+    public void visit(Aload s); 
     
     public void visit(Areturn s);
+
+    public void visit(Arraylength s);
     
     public void visit(Astore s);
     
@@ -30,10 +33,14 @@ public interface Visitor
     public void visit(Ireturn s);
     
     public void visit(Istore s);
+
+    public void visit(Iastore s);
     
     public void visit(Isub s);
     
     public void visit(Iadd s);
+
+    public void visit(Iaload s);
     
     public void visit(Invokevirtual s);
     
@@ -44,6 +51,8 @@ public interface Visitor
     public void visit(Print s);
     
     public void visit(New s);
+    
+    public void visit(NewarrayInt s);
     
     // type
     public void visit(ClassType t);
@@ -66,8 +75,9 @@ public interface Visitor
     
     // program
     public void visit(ProgramSingle p);
+
+    // field
+    public void visit(Getfield getfield);
     
-    
-    
-    
+    public void visit(Putfield putfield);
 }

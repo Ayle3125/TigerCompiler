@@ -2,3 +2,7 @@ bin/
 *.class
 *.bak
 *.j
+test/*.c
+runtime/*.java.c
+runtime/*.out
+runtime/*.log

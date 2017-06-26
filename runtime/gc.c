@@ -1,6 +1,36 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
+#include <sys/time.h>
+#include "control.h"
+#include "runtime.h"
+
+#ifdef __APPLE__
+#define GET_STACK_ARG_ADDRESS(base, index) (((void *)base)-(index)*sizeof(void *))
+#else
+#define GET_STACK_ARG_ADDRESS(base, index) (((void *)base)+(index)*sizeof(void *))
+#endif
+
+void log(const char *fmt, ...) {
+    if (gcLog) {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(gc_log_output, fmt, args);
+        va_end(args);
+        fputc('\n', gc_log_output);
+        fflush(gc_log_output);
+    }
+}
+
+void *xmalloc(int size) {
+    void *result = malloc(size);
+    if (result == NULL) {
+        fprintf(stderr, "fatal malloc returns NULL\n");
+        exit(1);
+    }
+    return result;
+}
 
 // The Gimple Garbage Collector.
 
@@ -8,7 +38,7 @@
 //===============================================================//
 // The Java Heap data structure.
 
-/*   
+/*
       ----------------------------------------------------
       |                        |                         |
       ----------------------------------------------------
@@ -16,14 +46,13 @@
       | \<~~~~~~~ size ~~~~~>/ |
     from                       to
  */
-struct JavaHeap
-{
-  int size;         // in bytes, note that this if for semi-heap size
-  char *from;       // the "from" space pointer
-  char *fromFree;   // the next "free" space in the from space
-  char *to;         // the "to" space pointer
-  char *toStart;    // "start" address in the "to" space
-  char *toNext;     // "next" free space pointer in the to space
+struct JavaHeap {
+    int size;         // in bytes, note that this if for semi-heap size
+    void *from;       // the "from" space pointer
+    void *fromFree;   // the next "free" space in the from space
+    void *to;         // the "to" space pointer
+    void *toStart;    // "start" address in the "to" space
+    void *toNext;     // "next" free space pointer in the to space
 };
 
 // The Java heap, which is initialized by the following
@@ -33,32 +62,196 @@ struct JavaHeap heap;
 // Lab 4, exercise 10:
 // Given the heap size (in bytes), allocate a Java heap
 // in the C heap, initialize the relevant fields.
-void Tiger_heap_init (int heapSize)
-{
-  // You should write 7 statement here:
-  // #1: allocate a chunk of memory of size "heapSize" using "malloc"
-
-  // #2: initialize the "size" field, note that "size" field
-  // is for semi-heap, but "heapSize" is for the whole heap.
-
-  // #3: initialize the "from" field (with what value?)
-
-  // #4: initialize the "fromFree" field (with what value?)
-
-  // #5: initialize the "to" field (with what value?)
-
-  // #6: initizlize the "toStart" field with NULL;
-
-  // #7: initialize the "toNext" field with NULL;
-
-  return;
+void Tiger_heap_init (int heapSize) {
+    void *m1 = xmalloc(heapSize);
+    void *m2 = xmalloc(heapSize);
+    heap.size = heapSize;
+    heap.from = m1;
+    heap.fromFree = m1;
+    heap.to = m2;
+    heap.toStart = m2;//TODO what this field is for?
+    heap.toNext = m2;
 }
 
-// The "prev" pointer, pointing to the top frame on the GC stack. 
-// (see part A of Lab 4)
-void *prev = 0;
+void *gc_frame_prev = NULL;
 
+//===============================================================//
+// The Gimple Garbage Collector
 
+/**
+ * this struct is a litte heavy weight, but it's easy to implement
+ * becuase we need to do BFS, so we will use a list to store the info
+ * */
+struct node {
+    void **to_be_process;
+    struct node *next;
+};
+
+void append(struct node **head, struct node **tail, void **to_be_process) {
+    if (!(*((struct __tiger_obj_header **)to_be_process)))
+        return;
+    log("debug: in append add 0x%lx to to-do list, have content 0x%lx",
+            (unsigned long)to_be_process,
+            (unsigned long)(*((struct __tiger_obj_header **)to_be_process)));
+    struct node *new = (struct node *)xmalloc(sizeof(struct node));
+    new->to_be_process = to_be_process;
+    new->next = NULL;
+    if (!*head) {
+        *head = *tail = new;
+    } else {
+        (*tail)->next = new;
+        *tail = new;
+    }
+}
+
+void **pop(struct node **head, struct node **tail) {
+    if (!*head) {
+        fprintf(stderr, "fatal pop a NULL\n");
+        exit(2);
+    }
+    void **result = (*head)->to_be_process;
+    if (*head == *tail) {
+        free(*head);
+        *head = *tail = NULL;
+    } else {
+        struct node *p = *head;
+        *head = p->next;
+        free(p);
+    }
+    return result;
+}
+
+void swap(void **p1, void **p2) {
+    void *tmp;
+    memcpy(&tmp, p1, sizeof(void *));
+    memcpy(p1, p2, sizeof(void *));
+    memcpy(p2, &tmp, sizeof(void *));
+}
+
+/**
+ * this function do the actual gc, it pop a pointer from list
+ * and copy it from 'from' space to 'to' space, and change the
+ * root pointer.
+ * */
+void forward(struct node **head, struct node **tail, void **p) {
+    struct __tiger_obj_header **root;
+    root = (struct __tiger_obj_header **)p;
+    struct __tiger_obj_header *to_be_process = *root;
+
+    if (to_be_process == NULL) {
+        log("fatal: 0x%lx to_be_process is NULL, this couldn't happen");
+        return;
+    }
+    if (to_be_process->__forwarding >= heap.to &&
+            to_be_process->__forwarding < heap.toNext) {
+        /* already being processed */
+        log("debug: 0x%lx 's content 0x%lx already being processed", (unsigned long)root, (unsigned long)to_be_process);
+        *root = to_be_process->__forwarding;
+        return;
+    }
+    log("debug: processing 0x%lx have content 0x%lx", (unsigned long)root, (unsigned long)to_be_process);
+    long size = sizeof(struct __tiger_obj_header);
+    struct vtable_header *vtable = (struct vtable_header *)to_be_process->__u.vptr;
+    switch (to_be_process->__obj_or_array) {
+        case 0:
+            /* obj */
+            size += strlen(vtable->__class_gc_map) * sizeof(void *); 
+            break;
+        case 1:
+            /* array */
+            size += to_be_process->__u.length * sizeof(int);
+            break;
+        default:
+            fprintf(stderr, "fatal, unknow type of tiger obj\n");
+            exit(4);
+    }
+    memcpy(heap.toNext, to_be_process, size);
+    *root = to_be_process->__forwarding = heap.toNext;
+    heap.toNext += size;
+    if (to_be_process->__obj_or_array == 0) {
+        /* obj */
+        void **next = (void *)to_be_process + sizeof(struct __tiger_obj_header);
+        const char *c;
+        int index;
+        for (index = 0, c = vtable->__class_gc_map;
+                *c != '\0';
+                c++, index++) {
+            if (*c == '1') {
+                log("debug: add 0x%lx to to-do list in the body of 0x%lx",
+                        (unsigned long)next + index*sizeof(void *),
+                        (unsigned long)to_be_process);
+                append(head, tail, (void *)next + index*sizeof(void *));
+            }
+        }
+    }
+}
+
+void process_list(struct node **head, struct node **tail) {
+    while (*head != NULL ||
+            *tail != NULL) {
+        void **to_be_process = pop(head, tail);
+        forward(head, tail, to_be_process);
+    }
+}
+
+double get_time_diff(struct timeval end, struct timeval start) {
+    return end.tv_sec - start.tv_sec + (end.tv_usec/1000000.0 - start.tv_usec/1000000.0);
+}
+
+void Tiger_gc() {
+    static int round = 0;
+    struct timeval start, end;
+    long size_before_gc;
+    gettimeofday(&start, NULL);
+    size_before_gc = heap.fromFree - heap.from;
+
+    struct node *head = NULL;
+    struct node *tail = NULL;
+
+    if (!gc_frame_prev) {
+        fprintf(stderr, "fatal no stack but Tiger_gc was called\n");
+        exit(5);
+    }
+
+    struct gc_frame_header *stack_top = gc_frame_prev;
+    for (; stack_top;
+            stack_top = stack_top->__prev) {
+        if (stack_top->__arguments_gc_map != NULL) {
+            char *p = stack_top->__arguments_gc_map;
+            int index = 0;
+            log("debug: deallocating arguments, __arguments_gc_map is '%s'", stack_top->__arguments_gc_map);
+            for (; *p != '\0'; p++, index++) {
+                if (*p == '1') {
+                    log("debug: using GET_STACK_ARG_ADDRESS of index %d", index);
+                    append(&head, &tail, GET_STACK_ARG_ADDRESS(stack_top->__arguments_base_address, index));
+                }
+            }
+        }
+        if (stack_top->__locals_gc_number != 0) {
+            log("debug: deallocating local, __locals_gc_number is %d", stack_top->__locals_gc_number);
+            void **base = (void *)stack_top + sizeof(struct gc_frame_header);
+            unsigned long index = 0;
+            for (; index < stack_top->__locals_gc_number;
+                    index++) {
+                log("debug: add 0x%lx to to-do list in local of index %ld",
+                        (unsigned long)base+index*sizeof(void *),
+                        index);
+                append(&head, &tail, (void *)base+index*sizeof(void *));
+            }
+        }
+        process_list(&head, &tail);
+    }
+    swap(&heap.to, &heap.from);
+    swap(&heap.toNext, &heap.fromFree);
+    heap.toStart = heap.toNext = heap.to;
+
+    long size_after_gc = heap.fromFree - heap.from;
+    gettimeofday(&end, NULL);
+    log("info: %d round of GC: %.5fs, collected %ld bytes",
+                    round,
+                    get_time_diff(end, start),
+                    size_before_gc - size_after_gc);
+}
 
 //===============================================================//
 // Object Model And allocation
@@ -74,9 +267,9 @@ void *prev = 0;
       |--------------|
       | length       | (this field should be empty for normal objects)
       |--------------|
-      | forwarding   | 
+      | forwarding   |
       |--------------|\
-p---->| v_0          | \      
+p---->| v_0          | \
       |--------------|  s
       | ...          |  i
       |--------------|  z
@@ -93,15 +286,37 @@ p---->| v_0          | \
 //   2. if there is no enough space left in the "from" space, then
 //      you should call the function "Tiger_gc()" to collect garbages.
 //      and after the collection, there are still two sub-cases:
-//        a: if there is enough space, you can do allocations just as case 1; 
+//        a: if there is enough space, you can do allocations just as case 1;
 //        b: if there is still no enough space, you can just issue
 //           an error message ("OutOfMemory") and exit.
 //           (However, a production compiler will try to expand
 //           the Java heap.)
-void *Tiger_new (void *vtable, int size)
-{
-  // Your code here:
-  
+void *Tiger_new(void *vtable, int size) {
+    int times = 0;
+    for (;; times++) {
+        if (heap.fromFree + size > heap.from + heap.size) {
+            // no space left
+            if (times == 1)
+                break;
+            else {
+                log("debug: having only %ld bytes remains when allocating %d bytes of obj", heap.fromFree - heap.from, size);
+                Tiger_gc();
+                continue;
+            }
+        } else {
+            struct __tiger_obj_header *result;
+            result = (struct __tiger_obj_header *)heap.fromFree;
+            /* TODO we should align it */
+            heap.fromFree += size;
+            memset(result, 0, size);
+            result->__u.vptr = vtable;
+            result->__obj_or_array = 0;//obj
+            log("debug: allocated 0x%lx obj of %d bytes", (unsigned long)result, size);
+            return result;
+        }
+    }
+    fprintf(stderr, "fatal: OutOfMemory\n");
+    exit(7);
 }
 
 // "new" an array of size "length", do necessary
@@ -114,9 +329,9 @@ void *Tiger_new (void *vtable, int size)
       |--------------|
       | length       |
       |--------------|
-      | forwarding   | 
+      | forwarding   |
       |--------------|\
-p---->| e_0          | \      
+p---->| e_0          | \
       |--------------|  s
       | ...          |  i
       |--------------|  z
@@ -138,20 +353,30 @@ p---->| e_0          | \
 //           an error message ("OutOfMemory") and exit.
 //           (However, a production compiler will try to expand
 //           the Java heap.)
-void *Tiger_new_array (int length)
-{
-  // Your code here:
-  
+struct __tiger_obj_header *Tiger_new_array(int length) {
+    int times = 0;
+    int size = length * sizeof(int) + sizeof(struct __tiger_obj_header);
+    for (;; times++) {
+        if (heap.fromFree + size > heap.from + heap.size) {
+            // no space left
+            if (times == 1)
+                break;// out of memory
+            else {
+                log("debug: having only %ld bytes remains when allocating %d bytes of array", heap.fromFree - heap.from, size);
+                Tiger_gc();
+                continue;
+            }
+        } else {
+            struct __tiger_obj_header *result;
+            result = (struct __tiger_obj_header *)heap.fromFree;
+            heap.fromFree += size;
+            memset(result, 0, size);
+            result->__u.length = length;
+            result->__obj_or_array = 1;//array
+            log("debug: allocated 0x%lx array of %d bytes", (unsigned long)result, size);
+            return result;
+        }
+    }
+    fprintf(stderr, "fatal: OutOfMemory\n");
+    exit(7);
 }
-
-//===============================================================//
-// The Gimple Garbage Collector
-
-// Lab 4, exercise 12:
-// A copying collector based-on Cheney's algorithm.
-static void Tiger_gc ()
-{
-  // Your code here:
-  
-}
-
