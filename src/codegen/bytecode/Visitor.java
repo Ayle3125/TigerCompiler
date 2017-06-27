@@ -37,6 +37,8 @@ public interface Visitor
     public void visit(Iastore s);
     
     public void visit(Isub s);
+
+    public void visit(Ixor s);
     
     public void visit(Iadd s);
 

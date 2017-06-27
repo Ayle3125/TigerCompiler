@@ -146,11 +146,13 @@ public class Ast
         {
             public Type.T type;
             public String id;
+            public boolean isUsed;
             
             public DecSingle(Type.T type, String id)
             {
                 this.type = type;
                 this.id = id;
+                this.isUsed = true;
             }
             
             @Override
@@ -517,19 +519,22 @@ public class Ast
         // assign
         public static class Assign extends T
         {
-            public String id;
+            public Exp.Id id;
             public Exp.T exp;
             public Type.T type; // type of the id
-            public boolean isField;
-            public boolean isLocal;
-            
-            public Assign(String id, Exp.T exp)
+
+            public Assign(Exp.Id id, Exp.T exp)
             {
                 this.id = id;
                 this.exp = exp;
-                this.type = null;
-                this.isField = false;
-                this.isLocal = false;
+                this.type = id.type;
+            }
+            
+            public Assign(Exp.Id id, Exp.T exp, Type.T type)
+            {
+                this.id = id;
+                this.exp = exp;
+                this.type = type;
             }
             
             @Override
@@ -542,19 +547,15 @@ public class Ast
         // assign-array
         public static class AssignArray extends T
         {
-            public String id;
+            public Exp.Id id;
             public Exp.T index;
             public Exp.T exp;
-            public boolean isField;
-            public boolean isLocal;
             
-            public AssignArray(String id, Exp.T index, Exp.T exp)
+            public AssignArray(Exp.Id id, Exp.T index, Exp.T exp)
             {
                 this.id = id;
                 this.index = index;
                 this.exp = exp;
-                this.isField = false;
-                this.isLocal = false;
             }
             
             @Override

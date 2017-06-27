@@ -2,6 +2,8 @@ package codegen.C;
 
 import java.util.ArrayList;
 import java.util.LinkedList;
+
+import ast.Ast.Exp;
 import ast.Ast.Exp.T;
 
 
@@ -236,9 +238,9 @@ public class Ast
             public boolean isField;
             public boolean isLocal;
 
-            public ast.Ast.Type.T type;
+            public Type.T type;
             
-            public Id(String id, boolean isField, boolean isLocal, ast.Ast.Type.T type ) {
+            public Id(String id, boolean isField, boolean isLocal, Type.T type ) {
                 this.id = id;
                 this.isField = isField;
                 this.isLocal = isLocal;
@@ -442,17 +444,13 @@ public class Ast
         
         public static class Assign extends T
         {
-            public String id;
+            public Exp.Id id;
             public Exp.T exp;
-            public boolean isField;
-            public boolean isLocal;
             public ast.Ast.Type.T type;
             
-            public Assign(String id, Exp.T exp, boolean isField, boolean isLocal, ast.Ast.Type.T type) {
+            public Assign(Exp.Id id, Exp.T exp,  ast.Ast.Type.T type) {
                 this.id = id;
                 this.exp = exp;
-                this.isField = isField;
-                this.isLocal = isLocal;
                 this.type = type;
             }
             
@@ -465,18 +463,14 @@ public class Ast
         
         public static class AssignArray extends T
         {
-            public String id;
+            public Exp.Id id;
             public Exp.T index;
             public Exp.T exp;
-            public boolean isField;
-            public boolean isLocal;
 
-            public AssignArray(String id, Exp.T index, Exp.T exp, boolean isField, boolean isLocal) {
+            public AssignArray(Exp.Id id, Exp.T index, Exp.T exp) {
                 this.id = id;
                 this.index = index;
                 this.exp = exp;
-                this.isField = isField;
-                this.isLocal = isLocal;
             }
             
             @Override

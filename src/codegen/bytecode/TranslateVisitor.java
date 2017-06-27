@@ -16,25 +16,10 @@ import codegen.bytecode.Ast.Method.MethodSingle;
 import codegen.bytecode.Ast.Program;
 import codegen.bytecode.Ast.Program.ProgramSingle;
 import codegen.bytecode.Ast.Stm;
-import codegen.bytecode.Ast.Stm.Aload;
-import codegen.bytecode.Ast.Stm.Areturn;
-import codegen.bytecode.Ast.Stm.Astore;
-import codegen.bytecode.Ast.Stm.Goto;
-import codegen.bytecode.Ast.Stm.Ificmplt;
-import codegen.bytecode.Ast.Stm.Ifne;
-import codegen.bytecode.Ast.Stm.Iload;
-import codegen.bytecode.Ast.Stm.Imul;
-import codegen.bytecode.Ast.Stm.Iadd;
-import codegen.bytecode.Ast.Stm.Invokevirtual;
-import codegen.bytecode.Ast.Stm.Ireturn;
-import codegen.bytecode.Ast.Stm.Istore;
-import codegen.bytecode.Ast.Stm.Isub;
-import codegen.bytecode.Ast.Stm.LabelJ;
-import codegen.bytecode.Ast.Stm.Ldc;
-import codegen.bytecode.Ast.Stm.New;
-import codegen.bytecode.Ast.Stm.Print;
+import codegen.bytecode.Ast.Stm.*;
 import codegen.bytecode.Ast.Type;
 import codegen.bytecode.Ast.Type.*;
+import codegen.bytecode.ClassTable;
 
 // Given a Java ast, translate it into Java bytecode.
 
@@ -49,14 +34,14 @@ public class TranslateVisitor implements ast.Visitor
     private Method.T method;
     private Class.T classs;
     private MainClass.T mainClass;
-    private boolean inAssign;
-    private LinkedList<Stm.T> assignList;
     public Program.T program;
+    private ClassTable table;
     
     public TranslateVisitor()
     {
+        this.table = new ClassTable();
         this.classId = null;
-        this.indexTable = new Hashtable<>();
+        this.indexTable = null;
         this.type = null;
         this.dec = null;
         this.stms = new LinkedList<Stm.T>();
@@ -64,8 +49,6 @@ public class TranslateVisitor implements ast.Visitor
         this.classs = null;
         this.mainClass = null;
         this.program = null;
-        this.inAssign = false;
-        this.assignList = null;
     }
     
     public static int getLineNumber() {
@@ -78,10 +61,7 @@ public class TranslateVisitor implements ast.Visitor
     
     private void emit(Stm.T s)
     {
-        if (this.inAssign)
-            this.assignList.add(s);
-        else
-            this.stms.add(s);
+        this.stms.add(s);
     }
     
     
@@ -95,6 +75,7 @@ public class TranslateVisitor implements ast.Visitor
         e.left.accept(this);
         e.right.accept(this);
         emit(new Iadd());
+        return;
     }
     
     @Override
@@ -123,6 +104,7 @@ public class TranslateVisitor implements ast.Visitor
         e.array.accept(this);
         e.index.accept(this);
         emit(new Stm.Iaload());
+        return;
     }
     
     //public Call(T exp, String id, java.util.LinkedList<T> args)
@@ -139,10 +121,22 @@ public class TranslateVisitor implements ast.Visitor
         e.rt.accept(this);
         Type.T rt = this.type;
         LinkedList<Type.T> at = new LinkedList<Type.T>();
+        
         for (ast.Ast.Type.T t : e.at) {
             t.accept(this);
             at.add(this.type);
         }
+
+        ClassBinding cb = this.table.get(e.type);
+        codegen.bytecode.Ftuple f = cb.methods.get(e.id);
+
+        for (int i = 0; i < at.size(); i++) {
+            Dec.DecSingle d = (Dec.DecSingle) f.args.get(i);
+            if (!at.get(i).toString().equals(d.type.toString()))
+                at.set(i, d.type);
+        }
+        
+        
         emit(new Invokevirtual(e.id, e.type, at, rt));
         return;
     }
@@ -156,12 +150,13 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.Id e)
     {
-
+        //System.out.println("------------------+ "+this.classId +" "+e.type);
         if (e.isField) {
+            emit(new Stm.Aload(0));
             e.type.accept(this);
-            Type.T type = this.type;
-            emit(new Stm.Getfield(this.classId, e.id, type));
-        } else {
+            emit(new Stm.Getfield(this.classId, e.id, this.type));
+        } 
+        else {
             int index = this.indexTable.get(e.id);
             ast.Ast.Type.T type = e.type;
             if (type.getNum() > 0)// a reference
@@ -194,12 +189,6 @@ public class TranslateVisitor implements ast.Visitor
         emit(new Ldc(1));
         emit(new Goto(el));
         emit(new LabelJ(el));
-        
-//        e.left.accept(this);
-//        e.right.accept(this);
-//        emit(new Ificmplt(g_label));
-//        g_label=null;
-        
         return;
     }
     
@@ -209,6 +198,7 @@ public class TranslateVisitor implements ast.Visitor
     {
         e.exp.accept(this);
         emit(new Stm.NewarrayInt());
+        return;
     }
     
     @Override
@@ -221,7 +211,9 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.Not e)
     {
-        System.out.println("NOT ->"+getLineNumber());
+        e.exp.accept(this);
+        emit(new Ldc(1));
+        emit(new Stm.Ixor());
     }
     
     @Override
@@ -259,7 +251,7 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.True e)
     {
-        System.out.println("imple True  ->"+getLineNumber());
+        this.emit(new Ldc(1));
     }
     
     
@@ -269,20 +261,17 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Stm.Assign s)
     {
-        if (s.isField) {
-            this.inAssign = true;//capture all emitted stm
-            this.assignList = new LinkedList<Stm.T>();
+       // System.out.println("field:"+s.id.isField);
+        if (s.id.isField) {
+            emit(new Stm.Aload(0));
             s.exp.accept(this);
             s.type.accept(this);
             Type.T type = this.type;
-            this.inAssign = false;
-            emit( new Stm.Putfield(this.classId, s.id, type, this.assignList) );
-            this.assignList = null;
+            emit( new Stm.Putfield(this.classId, s.id.id, type) );
         } else {
             s.exp.accept(this);
-            int index = this.indexTable.get(s.id);
+            int index = this.indexTable.get(s.id.id);
             ast.Ast.Type.T type = s.type;
-            
             if (type.getNum() > 0)
                 emit(new Astore(index));
             else
@@ -294,12 +283,13 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Stm.AssignArray s)
     {
-        if (s.isField) {
-            emit(new Stm.Getfield(this.classId, s.id, new Type.IntArray()));
+        if (s.id.isField) {
+            emit(new Stm.Getfield(this.classId, s.id.id, new Type.IntArray()));
         } else {
-            int index = this.indexTable.get(s.id);
+            int index = this.indexTable.get(s.id.id);
             emit(new Stm.Aload(index));
         }
+        s.id.accept(this);
         s.index.accept(this);
         s.exp.accept(this);
         emit(new Stm.Iastore());
@@ -398,7 +388,6 @@ public class TranslateVisitor implements ast.Visitor
     public void visit(ast.Ast.Type.IntArray t)
     {
         this.type = new IntArray(); 
-        
     }
     
     // dec
@@ -457,11 +446,14 @@ public class TranslateVisitor implements ast.Visitor
     {
         this.classId = c.id;
         LinkedList<Dec.T> newDecs = new LinkedList<Dec.T>();
+        LinkedList<Method.T> newMethods = new LinkedList<Method.T>();
+        
         for (ast.Ast.Dec.T dec : c.decs) {
-            dec.accept(this);
+            ast.Ast.Dec.DecSingle d = (ast.Ast.Dec.DecSingle) dec;
+            d.accept(this);
+            this.dec = new DecSingle(this.type, d.id);
             newDecs.add(this.dec);
         }
-        LinkedList<Method.T> newMethods = new LinkedList<Method.T>();
         for (ast.Ast.Method.T m : c.methods) {
             m.accept(this);
             newMethods.add(this.method);
@@ -480,10 +472,74 @@ public class TranslateVisitor implements ast.Visitor
         return;
     }
     
+
+
+    // /////////////////////////////////////////////////////
+    // the first pass
+    public void scanMain(ast.Ast.MainClass.T m) {
+        this.table.init(((ast.Ast.MainClass.MainClassSingle) m).id, null);
+        // this is a special hacking in that we don't want to
+        // enter "main" into the table.
+        return;
+    }
+
+    public void scanClasses(java.util.LinkedList<ast.Ast.Class.T> cs) {
+        // put empty chuncks into the table
+        for (ast.Ast.Class.T c : cs) {
+            ast.Ast.Class.ClassSingle cc = (ast.Ast.Class.ClassSingle ) c;
+            this.table.init(cc.id, cc.extendss);
+        }
+
+        this.indexTable = new java.util.Hashtable<String, Integer>();
+        // put class fields and methods into the table
+        for (ast.Ast.Class.T c : cs) {
+            ast.Ast.Class.ClassSingle cc = (ast.Ast.Class.ClassSingle) c;
+            LinkedList<Dec.T> newDecs = new java.util.LinkedList<Dec.T>();
+            for (ast.Ast.Dec.T dec : cc.decs) {
+                dec.accept(this);
+                newDecs.add(this.dec);
+            }
+            this.table.initDecs(cc.id, newDecs);
+
+            // all methods
+            java.util.LinkedList<ast.Ast.Method.T> methods = cc.methods;
+            for (ast.Ast.Method.T mthd : methods) {
+                ast.Ast.Method.MethodSingle m = (ast.Ast.Method.MethodSingle) mthd;
+                java.util.LinkedList<Dec.T> newArgs = new java.util.LinkedList<Dec.T>();
+                for (ast.Ast.Dec.T arg : m.formals) {
+                    arg.accept(this);
+                    newArgs.add(this.dec);
+                }
+                m.retType.accept(this);
+                Type.T newRet = this.type;
+                this.table.initMethod(cc.id, newRet, newArgs, m.id);
+            }
+        }
+        // calculate all inheritance information
+        for (ast.Ast.Class.T c : cs) {
+            ast.Ast.Class.ClassSingle cc = (ast.Ast.Class.ClassSingle) c;
+            this.table.inherit(cc.id);
+        }
+    }
+
+    public void scanProgram(ast.Ast.Program.T p) {
+        ast.Ast.Program.ProgramSingle pp = (ast.Ast.Program.ProgramSingle) p;
+        scanMain(pp.mainClass);
+        scanClasses(pp.classes);
+        return;
+    }
+
+    // end of the first pass
+    // ////////////////////////////////////////////////////
+
+    
     // program
     @Override
     public void visit(ast.Ast.Program.ProgramSingle p)
     {
+
+        scanProgram(p);
+        
         // do translations
         p.mainClass.accept(this);
         
@@ -495,5 +551,4 @@ public class TranslateVisitor implements ast.Visitor
         this.program = new ProgramSingle(this.mainClass, newClasses);
         return;
     }
-    
 }

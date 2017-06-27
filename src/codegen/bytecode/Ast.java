@@ -328,6 +328,18 @@ public class Ast
             }
         }
         
+        public static class Ixor extends T {
+
+            public Ixor() {
+            }
+
+            @Override
+            public void accept(Visitor v) {
+                v.visit(this);
+            }
+        }
+
+        
         
         public static class Iadd extends T
         {
@@ -434,13 +446,11 @@ public class Ast
             public String classId;
             public String id;
             public Type.T type;
-            public LinkedList<T> assignList;
 
-            public Putfield(String classId, String id, Type.T type, LinkedList<T> assignList) {
+            public Putfield(String classId, String id, Type.T type) {
                 this.classId = classId;
                 this.id = id;
                 this.type = type;
-                this.assignList = assignList;
             }
 
             @Override

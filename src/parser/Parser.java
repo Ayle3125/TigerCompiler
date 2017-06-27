@@ -460,7 +460,7 @@ public class Parser
                 eatToken(Kind.TOKEN_SEMI);
                 
                 //public Assign(String id, Exp.T exp)
-                return new Assign(id, exp);
+                return new Assign(new Exp.Id(current.lineNum,id), exp);
             }else if(current.kind==Kind.TOKEN_LBRACK)
             {
                 Exp.T index, exp;
@@ -475,7 +475,7 @@ public class Parser
                 eatToken(Kind.TOKEN_SEMI);
                 
                 //public AssignArray(String id, Exp.T index, Exp.T exp)
-                return new AssignArray(id, index, exp);
+                return new AssignArray(new Exp.Id(current.lineNum,id), index, exp);
             }
             
             

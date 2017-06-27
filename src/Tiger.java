@@ -125,7 +125,6 @@ public class Tiger
         // optimize the AST
         ast.optimizations.Main optAstPasses = new ast.optimizations.Main();
         control.CompilerPass optAstPass = new control.CompilerPass("Optimizing the AST", optAstPasses, theAst);
-        // optAstPass.doitName("doit");
         optAstPass.doit();
         theAst = optAstPasses.program;
         
@@ -146,6 +145,8 @@ public class Tiger
             codegen.C.PrettyPrintVisitor ppc = new codegen.C.PrettyPrintVisitor();
             cAst.accept(ppc);
             break;
+        default:
+            
         }
         
     }

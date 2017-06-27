@@ -34,10 +34,10 @@ public class Control
     public static class ConCodeGen
     {
         public enum Kind_t {
-            Bytecode, C
+            Bytecode, C, NULL
         }
         
-        public static Kind_t codegen = Kind_t.Bytecode;
+        public static Kind_t codegen = Kind_t.NULL;
         
         // output .s file
         public static String fileName = null;

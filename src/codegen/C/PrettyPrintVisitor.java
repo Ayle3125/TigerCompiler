@@ -177,8 +177,8 @@ public class PrettyPrintVisitor implements Visitor
         if (e.isField)
             this.say("this->");
         else if (e.isLocal) {
-            if (e.type instanceof ast.Ast.Type.IntArray
-                    || e.type instanceof ast.Ast.Type.ClassType)
+            if (e.type instanceof Type.IntArray
+                    || e.type instanceof Type.ClassType)
                 this.say("__gc_frame.");
         }
         this.say(e.id);
@@ -267,9 +267,9 @@ public class PrettyPrintVisitor implements Visitor
     // statements
     @Override
     public void visit(Assign s){
-        if (s.isField)
+        if (s.id.isField)
             this.say("this->");
-        else if (s.isLocal) {
+        else if (s.id.isLocal) {
             if (s.type instanceof ast.Ast.Type.IntArray
                     || s.type instanceof ast.Ast.Type.ClassType)
                 this.say("__gc_frame.");
@@ -285,9 +285,9 @@ public class PrettyPrintVisitor implements Visitor
     @Override
     public void visit(AssignArray s)
     {
-        if (s.isField)
+        if (s.id.isField)
             this.say("this->");
-        else if (s.isLocal)
+        else if (s.id.isLocal)
             this.say("__gc_frame.");
         this.say(s.id + "->__data[");
         s.index.accept(this);

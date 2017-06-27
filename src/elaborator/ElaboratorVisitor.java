@@ -48,7 +48,7 @@ public class ElaboratorVisitor implements ast.Visitor
     public ElaboratorVisitor()
     {
         this.classTable = new ClassTable();
-        this.methodTable = new MethodTable();
+        this.methodTable = null;
         this.currentClass = null;
         this.type = null;
     }
@@ -61,6 +61,15 @@ public class ElaboratorVisitor implements ast.Visitor
         System.out.println("Line "+ String.valueOf(line) + " Error:" + errMsg);
         System.exit(1);
 
+        return;
+    }
+    
+    private void warning(int line, String errMsg)
+    {
+        if ( errMsg.equals("") ) {
+            errMsg = "Something could be better.";
+        }
+        System.out.println("Line "+ String.valueOf(line) + " Warning:" + errMsg);
         return;
     }
     
@@ -104,10 +113,9 @@ public class ElaboratorVisitor implements ast.Visitor
     @Override
     public void visit(ArraySelect e) //ArraySelect(T array, T index)
     {
-        Type.T type;
         e.array.accept(this);
-        type = this.type;
-        
+        if (!this.type.toString().equals("@int[]"))
+            error(getLineNumber(), "The type of Arrey must be INT[].");
         e.index.accept(this);
         if(!this.type.toString().equals("@int")){
             error(getLineNumber(), "The index of Arrey must be INT.");
@@ -145,7 +153,20 @@ public class ElaboratorVisitor implements ast.Visitor
         for (int i = 0; i < argsty.size(); i++) {
             Dec.DecSingle dec = (Dec.DecSingle) mty.argsType.get(i);
             if ( !dec.type.toString().equals(argsty.get(i).toString())) {
-                error( getLineNumber(), "");
+
+                ClassBinding cb = this.classTable.get(argsty.get(i).toString());
+                boolean findParent = false;
+                while (cb != null && cb.extendss != null) {
+                    if (!dec.type.toString().equals(cb.extendss))
+                        cb = this.classTable.get(cb.extendss);
+                    else {
+                        findParent = true;
+                        break;
+                    }
+                }
+                if (!findParent) {
+                    error( getLineNumber(), "");
+                }
             }
         }
         this.type = mty.retType;
@@ -166,6 +187,7 @@ public class ElaboratorVisitor implements ast.Visitor
     {
         // first look up the id in method table
         Type.T type = this.methodTable.get(e.id);
+        methodTable.useLocalVal(e.id);
         // if search failed, then s.id must be a class field.
         if (type == null) {
             type = this.classTable.get(this.currentClass, e.id);
@@ -178,8 +200,13 @@ public class ElaboratorVisitor implements ast.Visitor
         }
         
         if (type == null) {
-            error( getLineNumber(), "");
+            error( getLineNumber(), "unknown type.");
         }
+
+        if (!methodTable.isInit(e.id)) {
+            warning( getLineNumber(), "Haven't initialized.");
+        }
+        
         this.type = type;
         // record this type on this node for future use.
         e.type = type;
@@ -280,24 +307,36 @@ public class ElaboratorVisitor implements ast.Visitor
     public void visit(Assign s)
     {
         // first look up the id in method table
-        Type.T type = this.methodTable.get(s.id);
+        Type.T type = this.methodTable.get(s.id.id);
         // if search failed, then s.id must
         if (type == null) {
-            type = this.classTable.get(this.currentClass, s.id);
-            s.isField = true;
+            
+            //System.out.println("ffff+ "+s.id.id);
+            type = this.classTable.get(this.currentClass, s.id.id);
+            System.out.println(type);
+            s.id.isField = true;
         }
-
+        else {
+           // System.out.println("yyyyyyyyyyyy+ "+s.id);
+        }
         if (this.methodTable.locals.get(s.id) != null) {
-            s.isLocal = true;
+            s.id.isLocal = true;
         }
         
         if (type == null) {
-            error( getLineNumber(), "Assign unknow ");
+//            System.out.println("hh");
+//            this.methodTable.dump();
+            error( getLineNumber(), "Assign unknow type: "+ s.id);
+            return;
         }
+        
+        this.methodTable.initLocalVal(s.id.id);
+        this.methodTable.useLocalVal(s.id.id);
         s.exp.accept(this);
         s.type = type;
+
         if ( !this.type.toString().equals(type.toString()) ) {
-            error( getLineNumber(), "");
+            error( getLineNumber(), "Different type can't assign.");
         }
         return;
     }
@@ -305,15 +344,16 @@ public class ElaboratorVisitor implements ast.Visitor
     @Override
     public void visit(AssignArray s) //AssignArray(String id, Exp.T index, Exp.T exp)
     {
-        Type.T type=this.methodTable.get(s.id);
+        Type.T type=this.methodTable.get(s.id.id);
+        this.methodTable.initLocalVal(s.id.id);
+        this.methodTable.useLocalVal(s.id.id);
         
         if(type == null) {
-            type = this.classTable.get(this.currentClass, s.id);
-            s.isField = true;
+            type = this.classTable.get(this.currentClass, s.id.id);
+            s.id.isField = true;
         }
-
         if (this.methodTable.locals.get(s.id) != null) {
-            s.isLocal = true;
+            s.id.isLocal = true;
         }
         
         if(type == null) {
@@ -329,7 +369,7 @@ public class ElaboratorVisitor implements ast.Visitor
         if(type.toString().equals("@int[]"))
         {
             if(!this.type.toString().equals("@int")) {
-                error( getLineNumber(), "");
+                error( getLineNumber(), "Different type can't assign.");
             }
         }
         return;
@@ -410,7 +450,12 @@ public class ElaboratorVisitor implements ast.Visitor
     @Override
     public void visit(Dec.DecSingle d)
     {
-        error( getLineNumber(), "DecSingle type.");
+        String dt = d.type.toString();
+        if (!dt.equals("@int") && !dt.equals("@boolean") && !dt.equals("@int[]")) {
+            ClassBinding cb = this.classTable.get(dt);
+            if (cb == null)
+                error( getLineNumber(), "Unknown type.");
+        }
         return;
     }
     
@@ -427,14 +472,35 @@ public class ElaboratorVisitor implements ast.Visitor
     public void visit(Method.MethodSingle m)
     {
         // construct the method table
+        this.methodTable = new MethodTable();
         this.methodTable.put(m.formals, m.locals);
         
         if (ConAst.elabMethodTable)
             this.methodTable.dump();
-        
+
+        for (Dec.T d : m.locals) {
+            d.accept(this);
+        }
         for (Stm.T s : m.stms)
             s.accept(this);
+        
+        
+        // check return type
+        String retType = m.retType.toString();
         m.retExp.accept(this);
+        if (this.type == null || !retType.equals(this.type.toString()) ){
+            error( getLineNumber(), "Invalid return type.");
+        }
+        
+        //check if para used
+        for (Dec.T d : m.locals) {
+            Dec.DecSingle dec = (Dec.DecSingle) d;
+            Boolean value = methodTable.localValIsUseTable.get(dec.id);
+            if (!value) {
+                dec.isUsed = false;
+                warning( getLineNumber(), "unused variable:"+ dec.id);
+            }
+        }
         return;
     }
     

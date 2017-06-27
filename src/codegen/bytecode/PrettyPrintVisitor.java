@@ -164,6 +164,11 @@ public class PrettyPrintVisitor implements Visitor
         this.isayln("isub");
         return;
     }
+
+    @Override
+    public void visit(Ixor s) {
+        this.isayln("ixor");
+    }
     
     @Override
     public void visit(Iadd s) {
@@ -219,9 +224,6 @@ public class PrettyPrintVisitor implements Visitor
 
     @Override
     public void visit(Putfield field) {
-        this.isayln("aload_0");
-        for (Stm.T item: field.assignList)
-            item.accept(this);
         this.say("    putfield " + field.classId + "/" + field.id + " ");
         field.type.accept(this);
         this.sayln("");
