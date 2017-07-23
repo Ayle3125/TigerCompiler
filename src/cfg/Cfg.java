@@ -150,6 +150,12 @@ public class Cfg
   {
     public static abstract class T implements cfg.Acceptable
     {
+        public Object succ;
+        public Object pred;
+        public String dst;
+        T() {
+            pred = new Object();
+        }
     }
 
     public static class Add extends T
@@ -332,6 +338,12 @@ public class Cfg
   {
     public static abstract class T implements cfg.Acceptable
     {
+        public java.util.LinkedList<Block.T> succ;
+        public Object pred;
+
+        T() {
+            succ = new java.util.LinkedList<>();
+        }
     }
 
     public static class Goto extends T
@@ -401,6 +413,8 @@ public class Cfg
       public util.Label label;
       public LinkedList<Stm.T> stms;
       public Transfer.T transfer;
+      public java.util.LinkedList<Block.T> pred;
+      public java.util.LinkedList<Block.T> succ;
 
       public BlockSingle(util.Label label, LinkedList<Stm.T> stms,
           Transfer.T transfer)
@@ -408,6 +422,8 @@ public class Cfg
         this.label = label;
         this.stms = stms;
         this.transfer = transfer;
+        succ = new java.util.LinkedList<Block.T>();
+        pred = new java.util.LinkedList<Block.T>();
       }
 
       @Override

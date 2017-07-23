@@ -6,7 +6,7 @@ import java.io.PushbackInputStream;
 import static control.Control.ConAst.dumpAst;
 //import static control.Control.ConAst.testFac;
 import ast.Ast.Program;
-
+import codegen.C.Ast.Program.T;
 import lexer.Lexer;
 import lexer.Token;
 import parser.Parser;
@@ -127,6 +127,36 @@ public class Tiger
         control.CompilerPass optAstPass = new control.CompilerPass("Optimizing the AST", optAstPasses, theAst);
         optAstPass.doit();
         theAst = optAstPasses.program;
+
+        // Compile this program to C.
+        codegen.C.TranslateVisitor transC = new codegen.C.TranslateVisitor();
+        control.CompilerPass genCCodePass = new control.CompilerPass("Translation to C code", theAst, transC);
+        genCCodePass.doit();
+        T cAst = transC.program;
+
+        if (control.Control.ConAst.dumpC) {
+            codegen.C.PrettyPrintVisitor ppC = new codegen.C.PrettyPrintVisitor();
+            control.CompilerPass ppCCodePass = new control.CompilerPass("C code printing", cAst, ppC);
+            ppCCodePass.doit();
+        }
+
+        // translation to control-flow graph
+        cfg.TranslateVisitor transCfg = new cfg.TranslateVisitor();
+        control.CompilerPass genCfgCodePass = new control.CompilerPass("Control-flow graph generation", cAst, transCfg);
+        genCfgCodePass.doit();
+        cfg.Cfg.Program.T cfgAst = transCfg.program;
+
+        // visualize the control-flow graph, if necessary
+        if (control.Control.visualize != Control.Visualize_Kind_t.None) {
+            cfg.VisualVisitor toDot = new cfg.VisualVisitor();
+            control.CompilerPass genDotPass = new control.CompilerPass("Draw control-flow graph", cfgAst, toDot);
+            genDotPass.doit();
+        }
+
+        // optimizations on the control-flow graph
+        cfg.optimizations.Main cfgOpts = new cfg.optimizations.Main();
+        control.CompilerPass cfgOptPass = new control.CompilerPass("Control-flow graph optimizations", cfgOpts, cfgAst);
+        cfgOptPass.doit();
         
         // ////////////////////////////////////////////////////////////////////////
         // code generation
@@ -139,9 +169,9 @@ public class Tiger
             bytecodeAst.accept(ppbc);
             break;
         case C:
-            codegen.C.TranslateVisitor transC = new codegen.C.TranslateVisitor();
-            theAst.accept(transC);
-            codegen.C.Ast.Program.T cAst = transC.program;
+            codegen.C.TranslateVisitor transCC = new codegen.C.TranslateVisitor();
+            theAst.accept(transCC);
+            codegen.C.Ast.Program.T cAstt = transCC.program;
             codegen.C.PrettyPrintVisitor ppc = new codegen.C.PrettyPrintVisitor();
             cAst.accept(ppc);
             break;

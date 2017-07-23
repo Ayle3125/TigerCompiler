@@ -313,7 +313,7 @@ public class ElaboratorVisitor implements ast.Visitor
             
             //System.out.println("ffff+ "+s.id.id);
             type = this.classTable.get(this.currentClass, s.id.id);
-            System.out.println(type);
+            //System.out.println(type);
             s.id.isField = true;
         }
         else {

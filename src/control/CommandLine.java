@@ -71,13 +71,22 @@ public class CommandLine
                                 }), 
                         new Arg<Object>(
                                 "dump", 
-                                "{ast}",
+                                "{ast|c|dot}",
                                 "dump information about the given ir", 
                                 Kind.String, (ss) -> {
                                     String s = (String) ss;
                                     if (s.equals("ast")) {
                                         control.Control.ConAst.dumpAst = true;
-                                    } else {
+                                    } 
+                                    else if (s.equals("c") || s.equals("C")) {
+                                        control.Control.ConAst.dumpC = true;
+                                    } 
+                                    else if (s.equals("cyclone")) {
+                                        control.Control.ConAst.dumpCyclone = true;
+                                    } 
+                                    else if (s.equals("dot")) {
+                                        control.Control.ConAst.dumpDot = true;
+                                    }else {
                                         System.out.println("bad argument: " + s);
                                         output();
                                         System.exit(1);

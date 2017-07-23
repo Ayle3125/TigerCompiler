@@ -130,13 +130,14 @@ public class TranslateVisitor implements ast.Visitor
         Exp.T exp = this.exp;
         LinkedList<Exp.T> args = new LinkedList<Exp.T>();
         
-        
         if(e.args!=null)
             for (ast.Ast.Exp.T x : e.args) {
                 x.accept(this);
                 args.add(this.exp);
             }
-        this.exp = new Call(newid, exp, e.id, args);
+        e.rt.accept(this);
+        Type.T retType = this.type;
+        this.exp = new Call(newid, exp, e.id, args, retType);
         return;
     }
     
@@ -159,7 +160,6 @@ public class TranslateVisitor implements ast.Visitor
     @Override
     public void visit(ast.Ast.Exp.Length e)
     {
-        // error(getLineNumber());
         e.array.accept(this);
         this.exp = new Length(this.exp);
     }

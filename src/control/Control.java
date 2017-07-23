@@ -23,6 +23,8 @@ public class Control
     public static class ConAst
     {
         public static boolean dumpAst = false;
+        public static boolean dumpC = false;
+        public static boolean dumpCyclone = false;
         public static boolean dumpDot = false;
         
         // elaborator
